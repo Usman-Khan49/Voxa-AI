@@ -1,0 +1,10 @@
+Microservices/User/node_modules
+Microservices/User/package-lock.json
+
+Microservices/Gateway/node_modules
+Microservices/Gateway/package-lock.json
+
+Microservices/AI/__pycache__
+Microservices/AI/index-tts/
+Microservices/AI/temp
+Microservices/AI/checkpoints

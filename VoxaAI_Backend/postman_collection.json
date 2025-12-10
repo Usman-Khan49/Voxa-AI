@@ -1,0 +1,249 @@
+{
+	"info": {
+		"name": "NLP Audio Processing API",
+		"description": "Complete workflow for audio transcription, text improvement, and voice synthesis",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Checks",
+			"item": [
+				{
+					"name": "Gateway Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{GATEWAY_URL}}/health",
+							"host": ["{{GATEWAY_URL}}"],
+							"path": ["health"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "User Service Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{USER_SERVICE_URL}}/health",
+							"host": ["{{USER_SERVICE_URL}}"],
+							"path": ["health"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "AI Service Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{AI_SERVICE_URL}}/health",
+							"host": ["{{AI_SERVICE_URL}}"],
+							"path": ["health"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set(\"AUTH_TOKEN\", response.token);",
+									"    pm.collectionVariables.set(\"USER_ID\", response.user.id);",
+									"    console.log(\"Token saved to collection:\", response.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"Test123!\",\n  \"name\": \"Test User\"\n}"
+						},
+						"url": {
+							"raw": "{{GATEWAY_URL}}/api/auth/register",
+							"host": ["{{GATEWAY_URL}}"],
+							"path": ["api", "auth", "register"]
+						},
+						"description": "Register a new user and automatically save the authentication token"
+					},
+					"response": []
+				},
+				{
+					"name": "Login User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set(\"AUTH_TOKEN\", response.token);",
+									"    pm.collectionVariables.set(\"USER_ID\", response.user.id);",
+									"    console.log(\"Token saved to collection:\", response.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"Test123!\"\n}"
+						},
+						"url": {
+							"raw": "{{GATEWAY_URL}}/api/auth/login",
+							"host": ["{{GATEWAY_URL}}"],
+							"path": ["api", "auth", "login"]
+						},
+						"description": "Login with existing credentials and automatically save the authentication token"
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Token",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AUTH_TOKEN}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{GATEWAY_URL}}/api/auth/verify",
+							"host": ["{{GATEWAY_URL}}"],
+							"path": ["api", "auth", "verify"]
+						},
+						"description": "Verify that your authentication token is valid"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Audio Processing",
+			"item": [
+				{
+					"name": "Process Audio (Full Workflow)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AUTH_TOKEN}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "audio",
+									"type": "file",
+									"src": [],
+									"description": "Select an audio file (.wav, .mp3, .m4a, etc.)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{GATEWAY_URL}}/api/process-audio",
+							"host": ["{{GATEWAY_URL}}"],
+							"path": ["api", "process-audio"]
+						},
+						"description": "Upload an audio file for processing:\n1. Transcribes the audio to text\n2. Improves the English text using AI\n3. Generates new speech with the improved text\n4. Returns the improved audio file\n\nNote: This may take 10-30 seconds depending on audio length."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Direct AI Service (Optional)",
+			"item": [
+				{
+					"name": "Process Audio (Direct)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "audio",
+									"type": "file",
+									"src": [],
+									"description": "Select an audio file"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{AI_SERVICE_URL}}/process",
+							"host": ["{{AI_SERVICE_URL}}"],
+							"path": ["process"]
+						},
+						"description": "Direct access to AI service (bypasses authentication). Use this for testing the AI pipeline independently."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "GATEWAY_URL",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "USER_SERVICE_URL",
+			"value": "http://localhost:3001",
+			"type": "string"
+		},
+		{
+			"key": "AI_SERVICE_URL",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "AUTH_TOKEN",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "USER_ID",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

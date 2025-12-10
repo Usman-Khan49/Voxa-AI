@@ -1,0 +1,15 @@
+faster-whisper
+fastapi>=0.115.0
+uvicorn[standard]
+python-multipart
+google-genai
+python-dotenv
+torch
+torchaudio
+numpy
+librosa
+soundfile
+
+# Note: IndexTTS2 dependencies are managed separately in index-tts/pyproject.toml
+# The index-tts directory should be set up with: uv sync --all-extras
+# See: https://github.com/index-tts/index-tts for installation instructions
