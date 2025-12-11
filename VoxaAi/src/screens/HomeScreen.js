@@ -209,49 +209,69 @@ const HomeScreen = ({ navigation }) => {
                 No recordings yet
               </Text>
             ) : (
-              recordings.map((item) => (
-                <TouchableOpacity
-                  key={item._id}
-                  style={styles.historyItem}
-                  onPress={() =>
-                    navigation.navigate("AudioPlayer", {
-                      audioFile: {
-                        uri: item.originalAudioUrl,
-                        title: item.title,
-                        duration: item.duration,
-                      },
-                    })
-                  }
-                >
-                  <View style={styles.historyItemLeft}>
-                    <View style={styles.historyIconContainer}>
-                      <Ionicons
-                        name="musical-notes"
-                        size={20}
-                        color="#A0A0A0"
-                      />
+              recordings.map((item) => {
+                const hasEnhanced = !!item.enhancedAudioUrl;
+                const audioUrl = hasEnhanced
+                  ? item.enhancedAudioUrl
+                  : item.originalAudioUrl;
+
+                return (
+                  <TouchableOpacity
+                    key={item._id}
+                    style={styles.historyItem}
+                    onPress={() =>
+                      navigation.navigate("AudioPlayer", {
+                        audioFile: {
+                          uri: audioUrl,
+                          title: item.title,
+                          duration: item.duration,
+                        },
+                      })
+                    }
+                  >
+                    <View style={styles.historyItemLeft}>
+                      <View style={styles.historyIconContainer}>
+                        <Ionicons
+                          name={hasEnhanced ? "sparkles" : "musical-notes"}
+                          size={20}
+                          color={hasEnhanced ? colors.primary : "#A0A0A0"}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View
+                          style={{ flexDirection: "row", alignItems: "center" }}
+                        >
+                          <Text
+                            style={styles.historyItemTitle}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            {item.title}
+                          </Text>
+                          {hasEnhanced && (
+                            <View style={styles.enhancedBadge}>
+                              <Text style={styles.enhancedBadgeText}>
+                                Enhanced
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.historyItemDate}>
+                          {new Date(item.createdAt).toLocaleDateString()}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={styles.historyItemTitle}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {item.title}
+                    <View style={styles.historyItemRight}>
+                      <Text style={styles.historyDuration}>
+                        {item.duration}
                       </Text>
-                      <Text style={styles.historyItemDate}>
-                        {new Date(item.createdAt).toLocaleDateString()}
-                      </Text>
+                      <TouchableOpacity style={styles.playButton}>
+                        <Ionicons name="play" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
                     </View>
-                  </View>
-                  <View style={styles.historyItemRight}>
-                    <Text style={styles.historyDuration}>{item.duration}</Text>
-                    <TouchableOpacity style={styles.playButton}>
-                      <Ionicons name="play" size={16} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              ))
+                  </TouchableOpacity>
+                );
+              })
             )}
           </View>
         </ScrollView>
@@ -464,6 +484,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#FFFFFF",
     overflow: "hidden",
+  },
+  enhancedBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  enhancedBadgeText: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   historyItemDate: {
     fontSize: 12,

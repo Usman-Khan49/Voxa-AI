@@ -84,14 +84,21 @@ def generate_speech(reference_audio_path: str, text: str, output_path: str):
         ref_audio_for_tts = reference_audio_path
         temp_wav = None
         if not reference_audio_path.lower().endswith('.wav'):
-            print(f"[TTS] Converting audio to WAV format for IndexTTS...")
-            import librosa
-            import soundfile as sf
-            temp_wav = os.path.join(os.path.dirname(reference_audio_path), "temp_ref.wav")
-            audio, sr = librosa.load(reference_audio_path, sr=None)
-            sf.write(temp_wav, audio, sr)
-            ref_audio_for_tts = temp_wav
-            print(f"[TTS] Audio converted to WAV")
+            print(f"[TTS] Converting {os.path.splitext(reference_audio_path)[1]} to WAV format...")
+            try:
+                from pydub import AudioSegment
+                temp_wav = os.path.join(os.path.dirname(reference_audio_path), "temp_ref.wav")
+                
+                # Load audio using pydub (supports m4a, mp3, wav, etc.)
+                audio = AudioSegment.from_file(reference_audio_path)
+                # Export as WAV with proper settings for TTS
+                audio.export(temp_wav, format="wav", parameters=["-ar", "24000", "-ac", "1"])
+                ref_audio_for_tts = temp_wav
+                print(f"[TTS] Audio converted to WAV successfully")
+            except Exception as conv_error:
+                print(f"[TTS] Error converting audio: {conv_error}")
+                print(f"[TTS] Make sure FFmpeg is installed and in PATH")
+                raise
         
         # Prepare arguments for the isolated inference script
         # Ensure proper types for all parameters
@@ -101,9 +108,9 @@ def generate_speech(reference_audio_path: str, text: str, output_path: str):
             "output_path": os.path.abspath(output_path),
             "cfg_path": os.path.abspath(os.path.join(indextts_path, "checkpoints", "config.yaml")),
             "model_dir": os.path.abspath(os.path.join(indextts_path, "checkpoints")),
-            # Optimal settings for quality and performance (explicit types)
-            "use_fp16": bool(True),
-            "use_cuda_kernel": bool(False),
+            # GPU settings (requires NVIDIA GPU with CUDA)
+            "use_fp16": bool(True),  # Enable FP16 for faster GPU processing
+            "use_cuda_kernel": bool(True),  # Enable CUDA acceleration
             "use_deepspeed": bool(False),
             "emo_alpha": float(1.0),  # Use full emotion from reference audio
             "use_emo_text": bool(False),  # Disable text emotion (causes type errors)
@@ -182,7 +189,7 @@ except Exception as e:
         import select
         import time
         start_time = time.time()
-        timeout = 300  # 5 minutes
+        timeout = 600  # 10 minutes (CPU processing can take a while)
         
         while True:
             # Check timeout

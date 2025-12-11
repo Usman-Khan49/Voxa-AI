@@ -194,16 +194,34 @@ export const authService = {
 
       // Use native fetch for FormData (works better on React Native)
       if (isFormData) {
-        console.log("[API] Using fetch for FormData upload");
+        console.log(
+          "[API] Using fetch for FormData upload (with extended timeout for AI processing)"
+        );
         const token = await getToken();
 
-        const response = await fetch(`${API_URL}/recordings`, {
+        // Create timeout promise
+        const timeout = new Promise(
+          (_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error("Request timeout - AI processing taking too long")
+                ),
+              180000
+            ) // 3 minutes
+        );
+
+        // Create fetch promise
+        const fetchPromise = fetch(`${API_URL}/recordings`, {
           method: "POST",
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
           },
           body: data,
         });
+
+        // Race between fetch and timeout
+        const response = await Promise.race([fetchPromise, timeout]);
 
         if (!response.ok) {
           const errorData = await response
@@ -219,7 +237,11 @@ export const authService = {
 
       // Use axios for JSON data
       console.log("[API] Sending recording save request (JSON)...");
-      const response = await api.post("/recordings", data, { timeout: 60000 });
+      const response = await api.post("/recordings", data, {
+        timeout: 180000, // 3 minutes for AI processing (transcription + improvement + voice cloning)
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      });
       console.log("[API] Recording saved successfully");
       return response.data;
     } catch (error) {

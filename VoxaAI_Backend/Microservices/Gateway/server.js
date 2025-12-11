@@ -157,10 +157,7 @@ app.post(
 
 // Recordings Routes
 // POST /api/recordings - Upload audio and create recording entry
-// Note: We use uploadProfile (disk storage) or create a new one for recordings?
-// Let's reuse uploadProfile for disk storage or create a dedicated one if we want separate folder.
-// For simplicity, reusing 'uploads' folder via uploadProfile config is fine, or we can make a new one.
-// Let's use uploadProfile as it saves to 'uploads/'.
+// POST /api/recordings - Save recording and process through AI
 app.post(
   "/api/recordings",
   authMiddleware,
@@ -187,18 +184,17 @@ app.post(
       // Use PUBLIC_URL from environment if available, otherwise construct from request
       const baseUrl =
         process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
-      const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
+      const originalFileUrl = `${baseUrl}/uploads/${req.file.filename}`;
 
-      // Construct data for User Service
+      // Save original recording immediately (don't wait for AI)
       const recordingData = {
-        originalAudioUrl: fileUrl,
+        originalAudioUrl: originalFileUrl,
+        enhancedAudioUrl: null, // Will be updated later when AI finishes
         title: req.body.title || `Recording ${new Date().toLocaleString()}`,
         duration: req.body.duration || "0:00",
       };
 
-      console.log("[Gateway] Forwarding to User Service:", recordingData);
-
-      // Forward to User Service
+      console.log("[Gateway] Saving original recording to database...");
       const response = await axios.post(
         `${process.env.USER_SERVICE_URL}/api/recordings`,
         recordingData,
@@ -207,8 +203,26 @@ app.post(
         }
       );
 
-      console.log("[Gateway] Recording saved successfully");
-      res.status(201).json(response.data);
+      const savedRecording = response.data;
+      console.log(
+        "[Gateway] Original recording saved, ID:",
+        savedRecording._id
+      );
+
+      // Process AI in background (don't block the response)
+      console.log("[Gateway] Starting AI processing in background...");
+      processAudioInBackground(
+        req.file.path,
+        savedRecording._id,
+        baseUrl,
+        req.headers["authorization"]
+      );
+
+      // Return immediately with original recording
+      console.log(
+        "[Gateway] Returning response to client (AI processing continues in background)"
+      );
+      res.status(201).json(savedRecording);
     } catch (error) {
       console.error("Gateway Recording Upload Error:", error.message);
       res
@@ -217,6 +231,92 @@ app.post(
     }
   }
 );
+
+// Background AI processing function
+async function processAudioInBackground(
+  audioFilePath,
+  recordingId,
+  baseUrl,
+  authHeader
+) {
+  try {
+    console.log(
+      `[Gateway-BG] Starting AI processing for recording ${recordingId}`
+    );
+
+    const aiFormData = new FormData();
+    aiFormData.append("audio", fs.createReadStream(audioFilePath));
+
+    const aiResponse = await axios.post(
+      `${process.env.AI_SERVICE_URL}/process`,
+      aiFormData,
+      {
+        headers: aiFormData.getHeaders(),
+        responseType: "arraybuffer",
+        timeout: 600000, // 10 minutes timeout (generous for CPU)
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      }
+    );
+
+    console.log(
+      `[Gateway-BG] AI processing complete for ${recordingId}, saving enhanced audio...`
+    );
+
+    // Save the enhanced audio file as M4A
+    const enhancedFilename = `enhanced-${Date.now()}.m4a`;
+    const tempWavPath = path.join(
+      __dirname,
+      "uploads",
+      `temp-${Date.now()}.wav`
+    );
+    const enhancedPath = path.join(__dirname, "uploads", enhancedFilename);
+
+    fs.writeFileSync(tempWavPath, aiResponse.data);
+
+    // Convert WAV to M4A using ffmpeg
+    let enhancedAudioUrl;
+    try {
+      const { execSync } = require("child_process");
+      execSync(
+        `ffmpeg -i "${tempWavPath}" -c:a aac -b:a 128k "${enhancedPath}"`,
+        {
+          stdio: "ignore",
+        }
+      );
+      fs.unlinkSync(tempWavPath);
+      enhancedAudioUrl = `${baseUrl}/uploads/${enhancedFilename}`;
+      console.log(`[Gateway-BG] Enhanced audio converted to M4A`);
+    } catch (convError) {
+      console.log(`[Gateway-BG] FFmpeg not available, saving as WAV`);
+      fs.renameSync(tempWavPath, enhancedPath.replace(".m4a", ".wav"));
+      enhancedAudioUrl = `${baseUrl}/uploads/${enhancedFilename.replace(
+        ".m4a",
+        ".wav"
+      )}`;
+    }
+
+    // Update the recording in database with enhanced audio URL
+    console.log(
+      `[Gateway-BG] Updating recording ${recordingId} with enhanced audio URL`
+    );
+    await axios.patch(
+      `${process.env.USER_SERVICE_URL}/api/recordings/${recordingId}`,
+      { enhancedAudioUrl },
+      { headers: { Authorization: authHeader } }
+    );
+
+    console.log(
+      `[Gateway-BG] ✅ Recording ${recordingId} enhanced successfully: ${enhancedAudioUrl}`
+    );
+  } catch (aiError) {
+    console.error(
+      `[Gateway-BG] ❌ AI processing failed for recording ${recordingId}:`,
+      aiError.message
+    );
+    console.log(`[Gateway-BG] Recording will remain with original audio only`);
+  }
+}
 
 // GET /api/recordings - List recordings
 app.get("/api/recordings", authMiddleware, async (req, res) => {

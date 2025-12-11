@@ -38,9 +38,9 @@ async def process_audio(audio: UploadFile = File(...)):
         improved_text = improve_text(transcribed_text)
         print(f"[STAGE 2] Text improvement complete. Improved text: '{improved_text}'")
         
-        # Step 3: Generate speech with IndexTTS
+        # Step 3: Generate speech with IndexTTS (GPU accelerated)
         output_path = TEMP_DIR / "output.wav"
-        print(f"[STAGE 3] Starting TTS generation with IndexTTS...")
+        print(f"[STAGE 3] Starting TTS generation with IndexTTS (GPU mode)...")
         print(f"[STAGE 3] Reference audio: {input_path}")
         print(f"[STAGE 3] Target text: '{improved_text}'")
         generate_speech(str(input_path), improved_text, str(output_path))

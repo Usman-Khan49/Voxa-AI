@@ -19,6 +19,7 @@ const { width, height } = Dimensions.get("window");
 const AllRecordingsScreen = ({ navigation }) => {
   const [recordings, setRecordings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("original"); // 'original' or 'enhanced'
 
   useEffect(() => {
     loadRecordings();
@@ -35,46 +36,72 @@ const AllRecordingsScreen = ({ navigation }) => {
     }
   };
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.recordingItem}
-      onPress={() =>
-        navigation.navigate("AudioPlayer", {
-          audioFile: {
-            uri: item.originalAudioUrl,
-            title: item.title,
-            duration: item.duration,
-          },
-        })
-      }
-    >
-      <View style={styles.recordingItemLeft}>
-        <View style={styles.recordingIconContainer}>
-          <Ionicons name="musical-notes" size={24} color="#A0A0A0" />
+  const renderItem = ({ item }) => {
+    const audioUrl =
+      activeTab === "enhanced" && item.enhancedAudioUrl
+        ? item.enhancedAudioUrl
+        : item.originalAudioUrl;
+
+    const hasEnhanced = !!item.enhancedAudioUrl;
+
+    return (
+      <TouchableOpacity
+        style={styles.recordingItem}
+        onPress={() =>
+          navigation.navigate("AudioPlayer", {
+            audioFile: {
+              uri: audioUrl,
+              title: item.title,
+              duration: item.duration,
+            },
+          })
+        }
+      >
+        <View style={styles.recordingItemLeft}>
+          <View style={styles.recordingIconContainer}>
+            <Ionicons
+              name={
+                activeTab === "enhanced" && hasEnhanced
+                  ? "sparkles"
+                  : "musical-notes"
+              }
+              size={24}
+              color={
+                activeTab === "enhanced" && hasEnhanced
+                  ? colors.primary
+                  : "#A0A0A0"
+              }
+            />
+          </View>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text
+              style={styles.recordingTitle}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {item.title || "Untitled Recording"}
+            </Text>
+            <Text style={styles.recordingDate}>
+              {item.createdAt
+                ? new Date(item.createdAt).toLocaleDateString()
+                : "Unknown Date"}
+            </Text>
+            {activeTab === "enhanced" && !hasEnhanced && (
+              <Text style={styles.processingText}>Processing...</Text>
+            )}
+          </View>
         </View>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <Text
-            style={styles.recordingTitle}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {item.title || "Untitled Recording"}
+        <View style={styles.recordingItemRight}>
+          <Text style={styles.recordingDuration}>
+            {item.duration || "0:00"}
           </Text>
-          <Text style={styles.recordingDate}>
-            {item.createdAt
-              ? new Date(item.createdAt).toLocaleDateString()
-              : "Unknown Date"}
-          </Text>
+          <TouchableOpacity style={styles.playButton}>
+            <Ionicons name="play" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
-      </View>
-      <View style={styles.recordingItemRight}>
-        <Text style={styles.recordingDuration}>{item.duration || "0:00"}</Text>
-        <TouchableOpacity style={styles.playButton}>
-          <Ionicons name="play" size={16} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -111,6 +138,36 @@ const AllRecordingsScreen = ({ navigation }) => {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Audios</Text>
           <View style={styles.headerSpacer} />
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "original" && styles.activeTab]}
+            onPress={() => setActiveTab("original")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "original" && styles.activeTabText,
+              ]}
+            >
+              Original
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "enhanced" && styles.activeTab]}
+            onPress={() => setActiveTab("enhanced")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "enhanced" && styles.activeTabText,
+              ]}
+            >
+              Enhanced
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Content */}
@@ -242,6 +299,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#A0A0A0",
   },
+  processingText: {
+    fontSize: 11,
+    color: "#FFA500",
+    marginTop: 2,
+  },
   recordingItemRight: {
     flexDirection: "row",
     alignItems: "center",
@@ -258,6 +320,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
+  },
+  tabsContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    gap: 12,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    alignItems: "center",
+  },
+  activeTab: {
+    backgroundColor: colors.primary,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#A0A0A0",
+  },
+  activeTabText: {
+    color: "#FFFFFF",
   },
   bottomNav: {
     position: "absolute",

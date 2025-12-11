@@ -9,6 +9,8 @@ torchaudio
 numpy
 librosa
 soundfile
+pydub
+ffmpeg-python
 
 # Note: IndexTTS2 dependencies are managed separately in index-tts/pyproject.toml
 # The index-tts directory should be set up with: uv sync --all-extras
