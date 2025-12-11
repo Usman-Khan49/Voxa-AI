@@ -19,7 +19,7 @@ const LOCAL_URL = `http://${COMPUTER_IP}:${API_PORT}`;
 // 2. Visit http://localhost:4040 to see your URLs
 // 3. Copy the HTTPS URL for port 3000 (looks like: https://xxxx-xx-xx-xx-xx.ngrok-free.app)
 // 4. Paste it below (without /api at the end)
-const NGROK_URL = "https://nonimperial-valrie-graniferous.ngrok-free.dev"; // Example: "https://1234-56-78-90-12.ngrok-free.app"
+const NGROK_URL = "https://cheekless-brashly-elma.ngrok-free.dev"; // Example: "https://1234-56-78-90-12.ngrok-free.app"
 
 // ========================================
 // Configuration Selection

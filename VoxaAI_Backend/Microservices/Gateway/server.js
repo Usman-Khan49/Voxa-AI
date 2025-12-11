@@ -10,6 +10,20 @@ const app = express();
 const fs = require("fs");
 const path = require("path");
 
+// In-memory progress tracking for AI processing
+const processingProgress = new Map();
+
+// Helper function to update progress
+const updateProgress = (recordingId, stage, progress) => {
+  processingProgress.set(recordingId, {
+    status: "processing",
+    stage,
+    progress,
+    timestamp: new Date().toISOString(),
+  });
+  console.log(`[Progress] Recording ${recordingId}: ${stage} (${progress}%)`);
+};
+
 // Configure Multer for disk storage (Profile Pictures)
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -209,20 +223,43 @@ app.post(
         savedRecording._id
       );
 
-      // Process AI in background (don't block the response)
-      console.log("[Gateway] Starting AI processing in background...");
-      processAudioInBackground(
-        req.file.path,
-        savedRecording._id,
-        baseUrl,
-        req.headers["authorization"]
-      );
+      // Initialize progress tracking
+      updateProgress(savedRecording._id, "Uploading...", 10);
 
-      // Return immediately with original recording
-      console.log(
-        "[Gateway] Returning response to client (AI processing continues in background)"
-      );
-      res.status(201).json(savedRecording);
+      // Process AI synchronously (WAIT for completion with progress updates)
+      console.log("[Gateway] Starting synchronous AI processing...");
+      try {
+        const enhancedAudioUrl = await processAudioSync(
+          req.file.path,
+          savedRecording._id,
+          baseUrl,
+          req.headers["authorization"]
+        );
+
+        // Mark as complete
+        processingProgress.set(savedRecording._id, {
+          status: "complete",
+          stage: "Complete",
+          progress: 100,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Return complete recording with enhanced audio
+        console.log(
+          "[Gateway] Returning complete recording with enhanced audio"
+        );
+        res.status(201).json({ ...savedRecording, enhancedAudioUrl });
+      } catch (aiError) {
+        // Mark as failed
+        processingProgress.set(savedRecording._id, {
+          status: "failed",
+          stage: "Failed",
+          progress: 0,
+          error: aiError.message,
+          timestamp: new Date().toISOString(),
+        });
+        throw aiError;
+      }
     } catch (error) {
       console.error("Gateway Recording Upload Error:", error.message);
       res
@@ -232,91 +269,99 @@ app.post(
   }
 );
 
-// Background AI processing function
-async function processAudioInBackground(
+// Synchronous AI processing function with progress tracking
+async function processAudioSync(
   audioFilePath,
   recordingId,
   baseUrl,
   authHeader
 ) {
+  console.log(
+    `[Gateway-Sync] Starting AI processing for recording ${recordingId}`
+  );
+
+  // Stage 1: Transcription (10-30%)
+  updateProgress(recordingId, "Transcribing speech...", 15);
+
+  const aiFormData = new FormData();
+  aiFormData.append("audio", fs.createReadStream(audioFilePath));
+
+  // Stage 2: Text Improvement (30-40%)
+  updateProgress(recordingId, "Improving text...", 30);
+
+  // Stage 3: Speech Generation (40-95%)
+  updateProgress(recordingId, "Generating enhanced speech...", 50);
+
+  const aiResponse = await axios.post(
+    `${process.env.AI_SERVICE_URL}/process`,
+    aiFormData,
+    {
+      headers: aiFormData.getHeaders(),
+      responseType: "arraybuffer",
+      timeout: 600000, // 10 minutes timeout (generous for CPU)
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    }
+  );
+
+  // Stage 4: Finalizing (95-100%)
+  updateProgress(recordingId, "Finalizing...", 95);
+
+  console.log(
+    `[Gateway-Sync] AI processing complete for ${recordingId}, saving enhanced audio...`
+  );
+
+  // Save the enhanced audio file as M4A
+  const enhancedFilename = `enhanced-${Date.now()}.m4a`;
+  const tempWavPath = path.join(
+    __dirname,
+    "uploads",
+    `temp-${Date.now()}.wav`
+  );
+  const enhancedPath = path.join(__dirname, "uploads", enhancedFilename);
+
+  fs.writeFileSync(tempWavPath, aiResponse.data);
+
+  // Convert WAV to M4A using ffmpeg
+  let enhancedAudioUrl;
   try {
-    console.log(
-      `[Gateway-BG] Starting AI processing for recording ${recordingId}`
-    );
-
-    const aiFormData = new FormData();
-    aiFormData.append("audio", fs.createReadStream(audioFilePath));
-
-    const aiResponse = await axios.post(
-      `${process.env.AI_SERVICE_URL}/process`,
-      aiFormData,
+    const { execSync } = require("child_process");
+    execSync(
+      `ffmpeg -i "${tempWavPath}" -c:a aac -b:a 128k "${enhancedPath}"`,
       {
-        headers: aiFormData.getHeaders(),
-        responseType: "arraybuffer",
-        timeout: 600000, // 10 minutes timeout (generous for CPU)
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity,
+        stdio: "ignore",
       }
     );
-
-    console.log(
-      `[Gateway-BG] AI processing complete for ${recordingId}, saving enhanced audio...`
-    );
-
-    // Save the enhanced audio file as M4A
-    const enhancedFilename = `enhanced-${Date.now()}.m4a`;
-    const tempWavPath = path.join(
-      __dirname,
-      "uploads",
-      `temp-${Date.now()}.wav`
-    );
-    const enhancedPath = path.join(__dirname, "uploads", enhancedFilename);
-
-    fs.writeFileSync(tempWavPath, aiResponse.data);
-
-    // Convert WAV to M4A using ffmpeg
-    let enhancedAudioUrl;
-    try {
-      const { execSync } = require("child_process");
-      execSync(
-        `ffmpeg -i "${tempWavPath}" -c:a aac -b:a 128k "${enhancedPath}"`,
-        {
-          stdio: "ignore",
-        }
-      );
-      fs.unlinkSync(tempWavPath);
-      enhancedAudioUrl = `${baseUrl}/uploads/${enhancedFilename}`;
-      console.log(`[Gateway-BG] Enhanced audio converted to M4A`);
-    } catch (convError) {
-      console.log(`[Gateway-BG] FFmpeg not available, saving as WAV`);
-      fs.renameSync(tempWavPath, enhancedPath.replace(".m4a", ".wav"));
-      enhancedAudioUrl = `${baseUrl}/uploads/${enhancedFilename.replace(
-        ".m4a",
-        ".wav"
-      )}`;
-    }
-
-    // Update the recording in database with enhanced audio URL
-    console.log(
-      `[Gateway-BG] Updating recording ${recordingId} with enhanced audio URL`
-    );
-    await axios.patch(
-      `${process.env.USER_SERVICE_URL}/api/recordings/${recordingId}`,
-      { enhancedAudioUrl },
-      { headers: { Authorization: authHeader } }
-    );
-
-    console.log(
-      `[Gateway-BG] ✅ Recording ${recordingId} enhanced successfully: ${enhancedAudioUrl}`
-    );
-  } catch (aiError) {
-    console.error(
-      `[Gateway-BG] ❌ AI processing failed for recording ${recordingId}:`,
-      aiError.message
-    );
-    console.log(`[Gateway-BG] Recording will remain with original audio only`);
+    fs.unlinkSync(tempWavPath);
+    enhancedAudioUrl = `${baseUrl}/uploads/${enhancedFilename}`;
+    console.log(`[Gateway-BG] Enhanced audio converted to M4A`);
+  } catch (convError) {
+    console.log(`[Gateway-BG] FFmpeg not available, saving as WAV`);
+    fs.renameSync(tempWavPath, enhancedPath.replace(".m4a", ".wav"));
+    enhancedAudioUrl = `${baseUrl}/uploads/${enhancedFilename.replace(
+      ".m4a",
+      ".wav"
+    )}`;
   }
+
+  // Update the recording in database with enhanced audio URL
+  console.log(
+    `[Gateway-Sync] Updating recording ${recordingId} with enhanced audio URL`
+  );
+  await axios.patch(
+    `${process.env.USER_SERVICE_URL}/api/recordings/${recordingId}`,
+    { enhancedAudioUrl },
+    { headers: { Authorization: authHeader } }
+  );
+
+  console.log(
+    `[Gateway-Sync] ✅ Recording ${recordingId} enhanced successfully: ${enhancedAudioUrl}`
+  );
+
+  // Return the enhanced audio URL
+  return enhancedAudioUrl;
 }
+
 
 // GET /api/recordings - List recordings
 app.get("/api/recordings", authMiddleware, async (req, res) => {
@@ -333,6 +378,16 @@ app.get("/api/recordings", authMiddleware, async (req, res) => {
       .status(error.response?.status || 500)
       .json(error.response?.data || { error: "Failed to fetch recordings" });
   }
+});
+
+// GET /api/recordings/:id/progress - Get processing progress
+app.get("/api/recordings/:id/progress", authMiddleware, (req, res) => {
+  const progress = processingProgress.get(req.params.id) || {
+    status: "unknown",
+    stage: "Unknown",
+    progress: 0,
+  };
+  res.json(progress);
 });
 
 app.get("/health", (req, res) => {

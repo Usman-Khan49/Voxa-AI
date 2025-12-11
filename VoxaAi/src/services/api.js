@@ -273,6 +273,20 @@ export const authService = {
     }
   },
 
+  // Get recording processing progress
+  getRecordingProgress: async (recordingId) => {
+    try {
+      const response = await api.get(`/recordings/${recordingId}/progress`);
+      return response.data;
+    } catch (error) {
+      console.error(
+        "Get progress error:",
+        error.response?.data || error.message
+      );
+      return { status: "unknown", stage: "Unknown", progress: 0 };
+    }
+  },
+
   // Get current user profile
   getCurrentUser: async () => {
     try {

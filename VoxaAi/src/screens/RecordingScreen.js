@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { colors } from "../styles/theme";
 import { authService } from "../services/api";
+import ProcessingModal from "../components/ProcessingModal";
 
 const { width, height } = Dimensions.get("window");
 
@@ -24,6 +25,12 @@ const RecordingScreen = ({ navigation }) => {
   const timerRef = useRef(null);
   const [permissionResponse, requestPermission] = Audio.usePermissions();
 
+  // Progress modal state
+  const [showProcessingModal, setShowProcessingModal] = useState(false);
+  const [processingStage, setProcessingStage] = useState("Uploading...");
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const pollIntervalRef = useRef(null);
+
   useEffect(() => {
     return () => {
       if (recording) {
@@ -31,6 +38,9 @@ const RecordingScreen = ({ navigation }) => {
       }
       if (timerRef.current) {
         clearInterval(timerRef.current);
+      }
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
       }
     };
   }, []);
@@ -121,6 +131,11 @@ const RecordingScreen = ({ navigation }) => {
           console.log(`[Recording] Filename: ${filename}`);
           console.log(`[Recording] Duration: ${formatTime(duration)}`);
 
+          // Show processing modal
+          setShowProcessingModal(true);
+          setProcessingStage("Uploading...");
+          setProcessingProgress(5);
+
           // Prepare FormData
           const formData = new FormData();
           formData.append("audio", {
@@ -132,30 +147,66 @@ const RecordingScreen = ({ navigation }) => {
           formData.append("duration", formatTime(duration));
 
           console.log("[Recording] Attempting to save recording to backend...");
-          // Save to backend
+
+          // Start polling for progress after a short delay (give backend time to save)
+          setTimeout(() => {
+            pollIntervalRef.current = setInterval(async () => {
+              try {
+                // Get the recording ID from the last saved recording
+                // Note: This is a simplified approach - ideally get ID from initial response
+                const progress = await authService.getRecordingProgress("temp");
+                console.log("[Recording] Progress update:", progress);
+
+                if (progress.stage) {
+                  setProcessingStage(progress.stage);
+                }
+                if (progress.progress) {
+                  setProcessingProgress(progress.progress);
+                }
+
+                // Stop polling if complete or failed
+                if (progress.status === "complete" || progress.status === "failed") {
+                  clearInterval(pollIntervalRef.current);
+                }
+              } catch (pollError) {
+                console.log("[Recording] Progress poll error:", pollError);
+              }
+            }, 2000); // Poll every 2 seconds
+          }, 1000);
+
+          // Save to backend (this will wait for AI processing to complete)
           const result = await authService.saveRecording(formData);
           console.log("[Recording] Recording saved successfully:", result);
 
-          // Navigate to AudioPlayer with the recorded file
+          // Stop polling
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+          }
+
+          // Hide modal
+          setShowProcessingModal(false);
+
+          // Navigate to AudioPlayer with the enhanced audio
           navigation.navigate("AudioPlayer", {
             audioFile: {
-              uri: uri,
+              uri: result.enhancedAudioUrl || uri, // Use enhanced audio if available
               name: filename,
             },
+            recording: result, // Pass the full recording object
           });
         } catch (error) {
           console.error("Failed to save recording:", error);
+
+          // Stop polling and hide modal
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+          }
+          setShowProcessingModal(false);
+
           Alert.alert(
             "Error",
-            "Failed to save recording to history, but you can still play it."
+            "Failed to enhance audio. Please try again."
           );
-          // Still navigate so user doesn't lose the recording locally
-          navigation.navigate("AudioPlayer", {
-            audioFile: {
-              uri: uri,
-              name: `Recording_${new Date().getTime()}.m4a`,
-            },
-          });
         }
       }
     } else {
@@ -259,6 +310,13 @@ const RecordingScreen = ({ navigation }) => {
           </View>
         </View>
       </LinearGradient>
+
+      {/* Processing Modal */}
+      <ProcessingModal
+        visible={showProcessingModal}
+        stage={processingStage}
+        progress={processingProgress}
+      />
     </View>
   );
 };

@@ -1,5 +1,5 @@
 version: "2"
-authtoken: YOUR_NGROK_AUTH_TOKEN_HERE
+authtoken: 36fTgIELKgD67TazfB8PYCVx5v9_52uLQVurJgYd2Kp21DSAS
 tunnels:
   gateway:
     addr: 3000

@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: voxa-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: voxaai2024
+      MONGO_INITDB_DATABASE: voxaai
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - voxa-network
+
+  # User Service
+  user-service:
+    build:
+      context: ./voxaAi_backend/microservices/user
+      dockerfile: Dockerfile
+    container_name: voxa-user-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MONGODB_URI: mongodb://admin:voxaai2024@mongodb:27017/voxaai?authSource=admin
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+    depends_on:
+      - mongodb
+    networks:
+      - voxa-network
+    volumes:
+      - user_uploads:/app/uploads
+
+  # Gateway Service
+  gateway-service:
+    build:
+      context: ./voxaAi_backend/microservices/gateway
+      dockerfile: Dockerfile
+    container_name: voxa-gateway-service
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      USER_SERVICE_URL: http://user-service:3001
+      AI_SERVICE_URL: http://ai-service:8000
+      PUBLIC_URL: http://localhost:3000
+    depends_on:
+      - user-service
+      - ai-service
+    networks:
+      - voxa-network
+    volumes:
+      - gateway_uploads:/app/uploads
+
+  # AI Service
+  ai-service:
+    build:
+      context: ./voxaAi_backend/microservices/Ai
+      dockerfile: Dockerfile
+    container_name: voxa-ai-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      PYTHONUNBUFFERED: 1
+    networks:
+      - voxa-network
+    volumes:
+      - ai_temp:/app/temp
+      - ai_models:/app/index-tts/checkpoints
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+networks:
+  voxa-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  user_uploads:
+    driver: local
+  gateway_uploads:
+    driver: local
+  ai_temp:
+    driver: local
+  ai_models:
+    driver: local

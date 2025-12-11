@@ -1,0 +1,265 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+% Code listing style
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!10}
+}
+
+\title{\textbf{VoxaAI API Documentation}}
+\author{VoxaAI Team}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Overview}
+
+The VoxaAI API provides endpoints for user authentication, audio recording management, and AI-powered audio enhancement. The system uses a microservices architecture with three main services: Gateway, User, and AI services.
+
+\subsection{Base URL}
+\begin{itemize}
+    \item \textbf{Development:} \texttt{http://localhost:3000/api}
+    \item \textbf{Production:} \texttt{https://your-ngrok-url.ngrok-free.dev/api}
+\end{itemize}
+
+\subsection{Authentication}
+Most endpoints require JWT authentication. Include the token in the Authorization header:
+\begin{lstlisting}
+Authorization: Bearer <your_jwt_token>
+\end{lstlisting}
+
+\section{Authentication Endpoints}
+
+\subsection{POST /api/auth/register}
+Register a new user account.
+
+\textbf{Request Body:}
+\begin{lstlisting}[language=json]
+{
+  "email": "user@example.com",
+  "password": "securePassword123"
+}
+\end{lstlisting}
+
+\textbf{Response (200 OK):}
+\begin{lstlisting}[language=json]
+{
+  "message": "User registered successfully",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "_id": "507f1f77bcf86cd799439011",
+    "email": "user@example.com",
+    "createdAt": "2025-12-11T10:30:00.000Z"
+  }
+}
+\end{lstlisting}
+
+\subsection{POST /api/auth/login}
+Authenticate an existing user.
+
+\textbf{Request Body:}
+\begin{lstlisting}[language=json]
+{
+  "email": "user@example.com",
+  "password": "securePassword123"
+}
+\end{lstlisting}
+
+\textbf{Response (200 OK):}
+\begin{lstlisting}[language=json]
+{
+  "message": "Login successful",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "_id": "507f1f77bcf86cd799439011",
+    "email": "user@example.com",
+    "name": "John Doe",
+    "profilePicture": "https://example.com/profile.jpg"
+  }
+}
+\end{lstlisting}
+
+\subsection{GET /api/auth/verify}
+Verify the current JWT token.
+
+\textbf{Headers:} Requires \texttt{Authorization: Bearer <token>}
+
+\textbf{Response (200 OK):}
+\begin{lstlisting}[language=json]
+{
+  "user": {
+    "_id": "507f1f77bcf86cd799439011",
+    "email": "user@example.com",
+    "name": "John Doe"
+  }
+}
+\end{lstlisting}
+
+\subsection{PUT /api/auth/profile}
+Update user profile information.
+
+\textbf{Headers:} \texttt{Authorization: Bearer <token>}, \texttt{Content-Type: multipart/form-data}
+
+\textbf{Request Body (form-data):}
+\begin{itemize}
+    \item \texttt{name} (optional): User's full name
+    \item \texttt{phoneNumber} (optional): Phone number
+    \item \texttt{contentType} (optional): Content creator type
+    \item \texttt{profilePicture} (optional): Image file
+\end{itemize}
+
+\textbf{Response (200 OK):}
+\begin{lstlisting}[language=json]
+{
+  "message": "Profile updated successfully",
+  "user": {
+    "_id": "507f1f77bcf86cd799439011",
+    "email": "user@example.com",
+    "name": "John Doe",
+    "phoneNumber": "1234567890",
+    "profilePicture": "https://example.com/uploads/profile.jpg",
+    "contentType": "Podcaster"
+  }
+}
+\end{lstlisting}
+
+\section{Recording Endpoints}
+
+\subsection{POST /api/recordings}
+Upload and process an audio recording with AI enhancement.
+
+\textbf{Headers:} \texttt{Authorization: Bearer <token>}, \texttt{Content-Type: multipart/form-data}
+
+\textbf{Request Body (form-data):}
+\begin{itemize}
+    \item \texttt{audio}: Audio file (m4a, mp3, wav)
+    \item \texttt{title}: Recording title
+    \item \texttt{duration}: Recording duration (format: MM:SS)
+\end{itemize}
+
+\textbf{Response (201 Created):}
+\begin{lstlisting}[language=json]
+{
+  "_id": "507f1f77bcf86cd799439012",
+  "userId": "507f1f77bcf86cd799439011",
+  "title": "Recording_1765473120911.m4a",
+  "duration": "00:04",
+  "originalAudioUrl": "https://example.com/uploads/original.m4a",
+  "enhancedAudioUrl": "https://example.com/uploads/enhanced.m4a",
+  "createdAt": "2025-12-11T10:35:00.000Z",
+  "updatedAt": "2025-12-11T10:35:45.000Z"
+}
+\end{lstlisting}
+
+\textbf{Processing Time:} 30-60 seconds (synchronous processing with AI enhancement)
+
+\subsection{GET /api/recordings}
+Retrieve all recordings for the authenticated user.
+
+\textbf{Headers:} \texttt{Authorization: Bearer <token>}
+
+\textbf{Response (200 OK):}
+\begin{lstlisting}[language=json]
+[
+  {
+    "_id": "507f1f77bcf86cd799439012",
+    "userId": "507f1f77bcf86cd799439011",
+    "title": "Recording_1765473120911.m4a",
+    "duration": "00:04",
+    "originalAudioUrl": "https://example.com/uploads/original.m4a",
+    "enhancedAudioUrl": "https://example.com/uploads/enhanced.m4a",
+    "createdAt": "2025-12-11T10:35:00.000Z"
+  }
+]
+\end{lstlisting}
+
+\subsection{GET /api/recordings/:id/progress}
+Get real-time processing progress for a recording.
+
+\textbf{Headers:} \texttt{Authorization: Bearer <token>}
+
+\textbf{Response (200 OK):}
+\begin{lstlisting}[language=json]
+{
+  "status": "processing",
+  "stage": "Generating enhanced speech...",
+  "progress": 50,
+  "timestamp": "2025-12-11T10:35:30.000Z"
+}
+\end{lstlisting}
+
+\textbf{Possible Stages:}
+\begin{itemize}
+    \item \texttt{Uploading...} (10\%)
+    \item \texttt{Transcribing speech...} (15-30\%)
+    \item \texttt{Improving text...} (30-40\%)
+    \item \texttt{Generating enhanced speech...} (40-95\%)
+    \item \texttt{Finalizing...} (95-100\%)
+    \item \texttt{Complete} (100\%)
+\end{itemize}
+
+\section{AI Processing Endpoint}
+
+\subsection{POST /api/process-audio}
+Process audio through AI pipeline (internal use).
+
+\textbf{Headers:} \texttt{Authorization: Bearer <token>}, \texttt{Content-Type: multipart/form-data}
+
+\textbf{Request Body:}
+\begin{itemize}
+    \item \texttt{audio}: Audio file
+\end{itemize}
+
+\textbf{Response (200 OK):}
+\begin{itemize}
+    \item Returns binary audio file (WAV format)
+    \item \texttt{Content-Type: audio/wav}
+\end{itemize}
+
+\section{Error Responses}
+
+\subsection{Common Error Codes}
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lp{8cm}@{}}
+\toprule
+\textbf{Code} & \textbf{Description} \\ \midrule
+400 & Bad Request - Invalid input parameters \\
+401 & Unauthorized - Missing or invalid authentication token \\
+404 & Not Found - Resource does not exist \\
+500 & Internal Server Error - Server-side error \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Error Response Format}
+\begin{lstlisting}[language=json]
+{
+  "error": "Error message describing what went wrong"
+}
+\end{lstlisting}
+
+\section{Rate Limiting}
+Currently, no rate limiting is implemented. For production deployment, implement rate limiting based on:
+\begin{itemize}
+    \item IP address: 100 requests/minute
+    \item User account: 1000 requests/day
+    \item AI processing: 10 concurrent requests per user
+\end{itemize}
+
+\section{WebSocket/Real-Time Updates}
+Future enhancement: Implement WebSocket connections for real-time progress updates instead of polling.
+
+\end{document}

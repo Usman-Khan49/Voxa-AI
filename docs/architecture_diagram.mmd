@@ -1,0 +1,61 @@
+graph TB
+    subgraph "Client Layer"
+        Mobile["📱 Mobile App<br/>(React Native + Expo)"]
+    end
+
+    subgraph "API Gateway Layer"
+        Gateway["🌐 Gateway Service<br/>(Node.js + Express)<br/>Port: 3000"]
+        Ngrok["🔗 Ngrok Tunnel<br/>(Public Access)"]
+    end
+
+    subgraph "Microservices Layer"
+        User["👤 User Service<br/>(Node.js + Express)<br/>Port: 3001<br/>• Authentication (JWT)<br/>• User Management<br/>• Recording Metadata"]
+        AI["🤖 AI Service<br/>(Python + FastAPI)<br/>Port: 8000<br/>• Speech-to-Text (Whisper)<br/>• Text Enhancement (Gemini)<br/>• Voice Cloning (IndexTTS2)"]
+    end
+
+    subgraph "Database Layer"
+        MongoDB["🗄️ MongoDB Atlas<br/>(Cloud Database)<br/>• Users Collection<br/>• Recordings Collection"]
+    end
+
+    subgraph "ML Models"
+        Whisper["🎤 Faster-Whisper<br/>(Speech Recognition)"]
+        Gemini["✨ Google Gemini 2.0<br/>(Text Improvement)"]
+        IndexTTS["🔊 IndexTTS2<br/>(Voice Cloning)<br/>GPU Accelerated"]
+    end
+
+    subgraph "Storage"
+        Files["📁 Local File Storage<br/>(Gateway/uploads)<br/>• Original Audio<br/>• Enhanced Audio<br/>• Profile Pictures"]
+    end
+
+    %% Client to Gateway
+    Mobile -->|"HTTPS Requests<br/>(Expo Tunnel)"| Ngrok
+    Ngrok -->|"Forward to Gateway"| Gateway
+
+    %% Gateway to Services
+    Gateway -->|"REST API<br/>/api/auth/*<br/>/api/recordings/*"| User
+    Gateway -->|"REST API<br/>/process"| AI
+    Gateway -->|"File Upload/Download"| Files
+
+    %% Services to Database
+    User -->|"Mongoose ODM"| MongoDB
+    
+    %% AI Service to Models
+    AI -->|"Audio Input"| Whisper
+    Whisper -->|"Transcribed Text"| Gemini
+    Gemini -->|"Improved Text"| IndexTTS
+    IndexTTS -->|"Enhanced Audio"| AI
+
+    %% Styling
+    classDef frontend fill:#4A90E2,stroke:#2E5C8A,stroke-width:2px,color:#fff
+    classDef gateway fill:#50C878,stroke:#2E7D4E,stroke-width:2px,color:#fff
+    classDef service fill:#9B59B6,stroke:#6C3483,stroke-width:2px,color:#fff
+    classDef database fill:#E74C3C,stroke:#A93226,stroke-width:2px,color:#fff
+    classDef ml fill:#F39C12,stroke:#CA6F1E,stroke-width:2px,color:#fff
+    classDef storage fill:#34495E,stroke:#1C2833,stroke-width:2px,color:#fff
+
+    class Mobile frontend
+    class Gateway,Ngrok gateway
+    class User,AI service
+    class MongoDB database
+    class Whisper,Gemini,IndexTTS ml
+    class Files storage
