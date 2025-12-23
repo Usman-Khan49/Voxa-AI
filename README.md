@@ -246,13 +246,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Google Gemini](https://ai.google.dev/) for text enhancement
 - [IndexTTS2](https://github.com/index-tts/index-tts) for voice cloning
 - Expo team for the amazing mobile development framework
-
-## Contact
-
-**Project Repository:** [https://github.com/Usman-Khan49/Voxa-AI](https://github.com/Usman-Khan49/Voxa-AI)
-
-**Report Issues:** [GitHub Issues](https://github.com/Usman-Khan49/Voxa-AI/issues)
-
 ---
 
 Made with ❤️ by the VoxaAI Team
